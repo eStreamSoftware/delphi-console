@@ -96,7 +96,7 @@ begin
 end;
 
 function TConsoleRedirector.GetNextLine: string;
-var Buffer: array[0..4095] of char;
+var Buffer: array[0..4095] of AnsiChar;
     BytesRead: Cardinal;
     iPos: integer;
     WasOK: boolean;
@@ -114,7 +114,7 @@ begin
           // finish buffer to PChar
           Buffer[BytesRead] := #0;
           // combine the buffer with the rest of the last run
-          FLine := FLine + Buffer;
+          FLine := FLine + string(Buffer);
         end else begin
           WaitForSingleObject(PI.hProcess, INFINITE);
           StopProcess;
