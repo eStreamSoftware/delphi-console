@@ -19,7 +19,8 @@ type
     procedure StartProcess;
     procedure StopProcess;
   public
-    constructor Create(const aAppName, aCmdLine: string);
+    constructor Create(const aAppName, aCmdLine: string); overload;
+    constructor Create(const aCmdLine: string); overload;
     procedure BeforeDestruction; override;
     procedure Execute;
     function EOF: boolean;
@@ -35,7 +36,7 @@ constructor TConsoleRedirector.Create(const aAppName, aCmdLine: string);
 begin
   inherited Create;
   FAppName := aAppName;
-  FCmdLine := ' ' + aCmdLine;  // Make sure there is a space in front else CreateProcess will fail
+  FCmdLine := aCmdLine;
   FActive := False;
   FLine := '';
 end;
@@ -46,6 +47,11 @@ begin
   StopProcess;
 end;
 
+constructor TConsoleRedirector.Create(const aCmdLine: string);
+begin
+  Create('', aCmdLine);
+end;
+
 function TConsoleRedirector.EOF: boolean;
 begin
   Result := not FActive and (FLine = '');
@@ -54,6 +60,7 @@ end;
 procedure TConsoleRedirector.Execute;
 var SA: TSecurityAttributes;
     WasOK: boolean;
+    pAppName: PChar;
 begin
   if FActive then
     raise Exception.Create('Service already start');
@@ -83,7 +90,10 @@ begin
   end;
 
   // launch the command line compiler
-  WasOK := CreateProcess(PChar(FAppName), PChar(FCmdLine), nil, nil, True, NORMAL_PRIORITY_CLASS, nil, nil, SI, PI);
+  pAppName := nil;
+  if FAppName <> '' then
+    pAppName := PChar(FAppName);
+  WasOK := CreateProcess(pAppName, PChar(FCmdLine), nil, nil, True, NORMAL_PRIORITY_CLASS, nil, nil, SI, PI);
 
   // Now that the handle has been inherited, close write to be safe.
   // We don't want to read or write to it accidentally.
@@ -123,8 +133,8 @@ begin
       until (iPos > 0) or not FActive;
     end;
     if iPos > 0 then begin
-      Result := Copy(FLine, 1, iPos);
-      Delete(FLine, 1, iPos + 1);
+      Result := Copy(FLine, 1, iPos - 1);   // Do not return CRLF
+      Delete(FLine, 1, iPos + 1);           // Remove up to next CRLF
     end;
   end;
 end;
