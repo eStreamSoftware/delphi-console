@@ -36,7 +36,7 @@ constructor TConsoleRedirector.Create(const aAppName, aCmdLine: string);
 begin
   inherited Create;
   FAppName := aAppName;
-  FCmdLine := aCmdLine;
+  FCmdLine := ' ' + aCmdLine;  // Make sure there is a space in front else CreateProcess will fail
   FActive := False;
   FLine := '';
 end;
@@ -135,6 +135,11 @@ begin
     if iPos > 0 then begin
       Result := Copy(FLine, 1, iPos - 1);   // Do not return CRLF
       Delete(FLine, 1, iPos + 1);           // Remove up to next CRLF
+    end else begin
+      // GetLastError should be ERROR_BROKEN_PIPE due to console program didn't flush the output buffer properly
+      // Will return whatever left in FLine
+      Result := FLine;
+      FLine := '';
     end;
   end;
 end;
