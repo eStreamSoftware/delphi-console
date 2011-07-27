@@ -36,7 +36,7 @@ constructor TConsoleRedirector.Create(const aAppName, aCmdLine: string);
 begin
   inherited Create;
   FAppName := aAppName;
-  FCmdLine := ' ' + aCmdLine;  // Make sure there is a space in front else CreateProcess will fail
+  FCmdLine := aCmdLine;
   FActive := False;
   FLine := '';
 end;
@@ -93,6 +93,7 @@ begin
   pAppName := nil;
   if FAppName <> '' then
     pAppName := PChar(FAppName);
+  UniqueString(FCmdLine);
   WasOK := CreateProcess(pAppName, PChar(FCmdLine), nil, nil, True, NORMAL_PRIORITY_CLASS, nil, nil, SI, PI);
 
   // Now that the handle has been inherited, close write to be safe.
