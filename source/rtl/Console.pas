@@ -84,7 +84,7 @@ begin
     cb := SizeOf(SI);
     dwFlags := STARTF_USESHOWWINDOW or STARTF_USESTDHANDLES;
     wShowWindow := SW_HIDE;
-    hStdInput := GetStdHandle(STD_INPUT_HANDLE); // don't redirect std input
+    hStdInput := StdOutPipeRead;
     hStdOutput := StdOutPipeWrite;
     hStdError := StdOutPipeWrite;
   end;
