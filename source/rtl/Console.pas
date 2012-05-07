@@ -5,16 +5,21 @@ interface
 uses Windows;
 
 type
+  // Reference: http://snippets.dzone.com/posts/show/5729
   TConsoleRedirector = class(TObject)
   private
     SI: TStartupInfo;
     PI: TProcessInformation;
-    StdOutPipeRead, StdOutPipeWrite: THandle;
+    FStdInRead: THandle;
+    FStdInWrite: THandle;
+    FStdOutRead: THandle;
+    FStdOutWrite: THandle;
     FAppName: string;
     FCmdLine: string;
     FLine: string;
     FActive: Boolean;
     FExitCode: DWORD;
+    procedure ClosePipeHandle(var H: THandle);
   protected
     procedure StartProcess;
     procedure StopProcess;
@@ -47,6 +52,14 @@ begin
   StopProcess;
 end;
 
+procedure TConsoleRedirector.ClosePipeHandle(var H: THandle);
+begin
+  if H <> 0 then begin
+    CloseHandle(H);
+    H := 0;
+  end;
+end;
+
 constructor TConsoleRedirector.Create(const aCmdLine: string);
 begin
   Create('', aCmdLine);
@@ -58,24 +71,35 @@ begin
 end;
 
 procedure TConsoleRedirector.Execute;
-var SA: TSecurityAttributes;
-    WasOK: boolean;
+var WasOK: boolean;
     pAppName: PChar;
+    SD: SECURITY_DESCRIPTOR;
+    SA: SECURITY_ATTRIBUTES;
 begin
   if FActive then
     raise Exception.Create('Service already start');
   StartProcess;
-  with SA do begin
-    nLength := SizeOf(SA);
-    bInheritHandle := True;
-    lpSecurityDescriptor := nil;
-  end;
+
+  ZeroMemory(@SD, SizeOf(SECURITY_DESCRIPTOR));
+  ZeroMemory(@SA, SizeOf(SECURITY_ATTRIBUTES));
+
+  if Win32Platform = VER_PLATFORM_WIN32_NT then begin
+    InitializeSecurityDescriptor(@SD, SECURITY_DESCRIPTOR_REVISION);
+    SetSecurityDescriptorDacl(@SD, True, nil, False);
+    SA.lpSecurityDescriptor := @SD;
+  end else
+    SA.lpSecurityDescriptor := nil;
+  SA.nLength := SizeOf(SECURITY_ATTRIBUTES);
+  SA.bInheritHandle := True;
+
   // create pipe for standard output redirection
-  CreatePipe(StdOutPipeRead,  // read handle
-             StdOutPipeWrite, // write handle
-             @SA,             // security attributes
-             0                // number of bytes reserved for pipe - 0 default
-            );
+  if not CreatePipe(FStdOutRead, FStdOutWrite, @SA, 0) or
+     not CreatePipe(FStdInRead, FStdInWrite, @SA, 0)
+  then
+    raise Exception.Create('Error while creating pipes');
+
+  SetHandleInformation(FStdOutRead, HANDLE_FLAG_INHERIT, 0);
+  SetHandleInformation(FStdInWrite, HANDLE_FLAG_INHERIT, 0);
 
   // Make child process use StdOutPipeWrite as standard out,
   // and make sure it does not show on screen.
@@ -84,9 +108,9 @@ begin
     cb := SizeOf(SI);
     dwFlags := STARTF_USESHOWWINDOW or STARTF_USESTDHANDLES;
     wShowWindow := SW_HIDE;
-    hStdInput := StdOutPipeRead;
-    hStdOutput := StdOutPipeWrite;
-    hStdError := StdOutPipeWrite;
+    hStdInput := FStdInRead;
+    hStdOutput := FStdOutWrite;
+    hStdError := FStdOutWrite;
   end;
 
   // launch the command line compiler
@@ -96,9 +120,12 @@ begin
   UniqueString(FCmdLine);
   WasOK := CreateProcess(pAppName, PChar(FCmdLine), nil, nil, True, NORMAL_PRIORITY_CLASS, nil, nil, SI, PI);
 
+  WaitForInputIdle(PI.hProcess, INFINITE);
+
   // Now that the handle has been inherited, close write to be safe.
   // We don't want to read or write to it accidentally.
-  CloseHandle(StdOutPipeWrite);
+  ClosePipeHandle(FStdOutWrite);
+
   // if process could be created then handle its output
   if not WasOK then
     raise Exception.Create(SysErrorMessage(GetLastError))
@@ -119,7 +146,7 @@ begin
     if iPos = 0 then begin
       repeat
         // read block of characters (might contain carriage returns and line feeds)
-        WasOK := ReadFile(StdOutPipeRead, Buffer, SizeOf(Buffer) - 1, BytesRead, nil);
+        WasOK := ReadFile(FStdOutRead, Buffer, SizeOf(Buffer) - 1, BytesRead, nil);
         // has anything been read?
         if WasOK and (BytesRead > 0) then begin
           // finish buffer to PChar
@@ -148,6 +175,10 @@ end;
 procedure TConsoleRedirector.StartProcess;
 begin
   FActive := True;
+  FStdInRead := 0;
+  FStdInWrite := 0;
+  FStdOutRead := 0;
+  FStdOutWrite := 0;
 end;
 
 procedure TConsoleRedirector.StopProcess;
@@ -156,7 +187,12 @@ begin
     GetExitCodeProcess(PI.hProcess, FExitCode);
     CloseHandle(PI.hThread);
     CloseHandle(PI.hProcess);
-    CloseHandle(StdOutPipeRead);
+
+    ClosePipeHandle(FStdInRead);
+    ClosePipeHandle(FStdInWrite);
+    ClosePipeHandle(FStdOutRead);
+    ClosePipeHandle(FStdOutWrite);
+
     FActive := False;
   end;
 end;
