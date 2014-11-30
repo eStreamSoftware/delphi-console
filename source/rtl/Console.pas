@@ -16,6 +16,7 @@ type
     FStdOutWrite: THandle;
     FAppName: string;
     FCmdLine: string;
+    FCurrentDirectory: string;
     FLine: string;
     FActive: Boolean;
     FExitCode: DWORD;
@@ -24,8 +25,10 @@ type
     procedure StartProcess;
     procedure StopProcess;
   public
-    constructor Create(const aAppName, aCmdLine: string); overload;
-    constructor Create(const aCmdLine: string); overload;
+    constructor Create(const aAppName, aCmdLine: string; aCurrentDirectory:
+        string); overload;
+    constructor Create(const aCmdLine: string; aCurrentDirectory: string = '');
+        overload;
     procedure BeforeDestruction; override;
     procedure Execute;
     function EOF: boolean;
@@ -37,11 +40,13 @@ implementation
 
 uses SysUtils;
 
-constructor TConsoleRedirector.Create(const aAppName, aCmdLine: string);
+constructor TConsoleRedirector.Create(const aAppName, aCmdLine: string;
+    aCurrentDirectory: string);
 begin
   inherited Create;
   FAppName := aAppName;
   FCmdLine := aCmdLine;
+  FCurrentDirectory := aCurrentDirectory;
   FActive := False;
   FLine := '';
 end;
@@ -60,9 +65,10 @@ begin
   end;
 end;
 
-constructor TConsoleRedirector.Create(const aCmdLine: string);
+constructor TConsoleRedirector.Create(const aCmdLine: string;
+    aCurrentDirectory: string = '');
 begin
-  Create('', aCmdLine);
+  Create('', aCmdLine, aCurrentDirectory);
 end;
 
 function TConsoleRedirector.EOF: boolean;
@@ -118,7 +124,7 @@ begin
   if FAppName <> '' then
     pAppName := PChar(FAppName);
   UniqueString(FCmdLine);
-  WasOK := CreateProcess(pAppName, PChar(FCmdLine), nil, nil, True, NORMAL_PRIORITY_CLASS, nil, nil, SI, PI);
+  WasOK := CreateProcess(pAppName, PChar(FCmdLine), nil, nil, True, NORMAL_PRIORITY_CLASS, nil, PChar(FCurrentDirectory), SI, PI);
 
   WaitForInputIdle(PI.hProcess, INFINITE);
 
