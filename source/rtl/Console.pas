@@ -78,7 +78,7 @@ end;
 
 procedure TConsoleRedirector.Execute;
 var WasOK: boolean;
-    pAppName: PChar;
+    pAppName, pCurDir: PChar;
     SD: SECURITY_DESCRIPTOR;
     SA: SECURITY_ATTRIBUTES;
 begin
@@ -124,7 +124,11 @@ begin
   if FAppName <> '' then
     pAppName := PChar(FAppName);
   UniqueString(FCmdLine);
-  WasOK := CreateProcess(pAppName, PChar(FCmdLine), nil, nil, True, NORMAL_PRIORITY_CLASS, nil, PChar(FCurrentDirectory), SI, PI);
+  if FCurrentDirectory.Trim.IsEmpty then
+    pCurDir := nil
+  else
+    pCurDir := PChar(FCurrentDirectory);
+  WasOK := CreateProcess(pAppName, PChar(FCmdLine), nil, nil, True, NORMAL_PRIORITY_CLASS, nil, pCurDir, SI, PI);
 
   WaitForInputIdle(PI.hProcess, INFINITE);
 
