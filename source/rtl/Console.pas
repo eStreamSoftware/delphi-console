@@ -2,7 +2,8 @@ unit Console;
 
 interface
 
-uses Winapi.Windows;
+uses
+  Winapi.Windows;
 
 type
   // Reference: http://snippets.dzone.com/posts/show/5729
@@ -38,7 +39,9 @@ type
 
 implementation
 
-uses System.SysUtils, App.ResStr;
+uses
+  System.SysUtils,
+  App.ResStr;
 
 constructor TConsoleRedirector.Create(const aAppName, aCmdLine: string;
     aCurrentDirectory: string);
