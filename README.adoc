@@ -1,0 +1,6 @@
+= Delphi Console
+:toc:
+
+= Introduction
+
+`delphi-console` captures console application output.  It supports Ansi, UTF8 and UTF-16 encoding.
