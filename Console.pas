@@ -3,7 +3,7 @@ unit Console;
 interface
 
 uses
-  Winapi.Windows;
+  Winapi.Windows, System.SysUtils;
 
 type
   // Reference: http://snippets.dzone.com/posts/show/5729
@@ -33,14 +33,11 @@ type
     procedure BeforeDestruction; override;
     procedure Execute;
     function EOF: boolean;
-    function GetNextLine: string;
+    function GetNextLine(aEncoding: TEncoding = nil): string;
     property ExitCode: DWORD read FExitCode;
   end;
 
 implementation
-
-uses
-  System.SysUtils;
 
 constructor TConsoleRedirector.Create(const aAppName, aCmdLine: string;
     aCurrentDirectory: string);
@@ -145,36 +142,39 @@ begin
     GetExitCodeProcess(PI.hProcess, FExitCode);
 end;
 
-function TConsoleRedirector.GetNextLine: string;
-var Buffer: array[0..4095] of AnsiChar;
+function TConsoleRedirector.GetNextLine(aEncoding: TEncoding = nil): string;
+var Buffer: TBytes;
     BytesRead: Cardinal;
     iPos: integer;
     WasOK: boolean;
 begin
+  SetLength(Buffer, 4096);
   Result := '';
   if not EOF then begin
-    iPos := Pos(#$0D#$0A, FLine);
+    iPos := Pos(sLineBreak, FLine);
 
     if iPos = 0 then begin
       repeat
         // read block of characters (might contain carriage returns and line feeds)
-        WasOK := ReadFile(FStdOutRead, Buffer, SizeOf(Buffer) - 1, BytesRead, nil);
+        WasOK := ReadFile(FStdOutRead, Buffer[0], Length(Buffer) - 2, BytesRead, nil);
         // has anything been read?
         if WasOK and (BytesRead > 0) then begin
           // finish buffer to PChar
-          Buffer[BytesRead] := #0;
+          Buffer[BytesRead] := 0;
+          Buffer[BytesRead + 1] := 0;
           // combine the buffer with the rest of the last run
-          FLine := FLine + string(Buffer);
+          if aEncoding = nil then aEncoding := TEncoding.UTF8;
+          FLine := FLine + aEncoding.GetString(Buffer, 0, BytesRead);
         end else begin
           WaitForSingleObject(PI.hProcess, INFINITE);
           StopProcess;
         end;
-        iPos := Pos(#$0D#$0A, FLine);
+        iPos := Pos(sLineBreak, FLine);
       until (iPos > 0) or not FActive;
     end;
     if iPos > 0 then begin
-      Result := Copy(FLine, 1, iPos - 1);   // Do not return CRLF
-      Delete(FLine, 1, iPos + 1);           // Remove up to next CRLF
+      Result := FLine.Substring(0, iPos - 1); // Do not return CRLF
+      FLine := FLine.Remove(0, iPos + 1);     // Remove up to next CRLF
     end else begin
       // GetLastError should be ERROR_BROKEN_PIPE due to console program didn't flush the output buffer properly
       // Will return whatever left in FLine
