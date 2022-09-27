@@ -40,8 +40,7 @@ type
 implementation
 
 uses
-  System.SysUtils,
-  App.ResStr;
+  System.SysUtils;
 
 constructor TConsoleRedirector.Create(const aAppName, aCmdLine: string;
     aCurrentDirectory: string);
@@ -86,7 +85,7 @@ var WasOK: boolean;
     SA: SECURITY_ATTRIBUTES;
 begin
   if FActive then
-    raise Exception.Create(rc_ServiceAlreadyStart);
+    raise Exception.Create('Service already start');
   StartProcess;
 
   ZeroMemory(@SD, SizeOf(SECURITY_DESCRIPTOR));
@@ -105,7 +104,7 @@ begin
   if not CreatePipe(FStdOutRead, FStdOutWrite, @SA, 0) or
      not CreatePipe(FStdInRead, FStdInWrite, @SA, 0)
   then
-    raise Exception.Create(rc_ErrorWhileCreatingPipes);
+    raise Exception.Create('Error while creating pipes');
 
   SetHandleInformation(FStdOutRead, HANDLE_FLAG_INHERIT, 0);
   SetHandleInformation(FStdInWrite, HANDLE_FLAG_INHERIT, 0);
